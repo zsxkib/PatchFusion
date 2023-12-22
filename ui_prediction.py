@@ -103,23 +103,6 @@ def load_ckpt(model, checkpoint):
     print("Loaded weights from {0}".format(checkpoint))
     return model
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--ckp_path", type=str, required=True)
-parser.add_argument("-m", "--model", type=str, default="zoedepth")
-parser.add_argument("--model_cfg_path", type=str, default="")
-args, unknown_args = parser.parse_known_args()
-
-overwrite_kwargs = parse_unknown(unknown_args)
-overwrite_kwargs['model_cfg_path'] = args.model_cfg_path
-overwrite_kwargs["model"] = args.model
-
-config = get_config_user(args.model, **overwrite_kwargs)
-config["pretrained_resource"] = ''
-model = build_model(config)
-model = load_ckpt(model, args.ckp_path)
-model.eval()
-model.cuda()
-
 def colorize(value, cmap='magma_r', vmin=None, vmax=None):
     # normalize
     vmin = value.min() if vmin is None else vmin
@@ -140,25 +123,30 @@ def colorize(value, cmap='magma_r', vmin=None, vmax=None):
 
     return rgb_value
 
-def predict_depth(model, image, mode, pn, reso, ps):
+def predict_depth(model, image, mode, pn, reso, ps, device=None, preprocess=None):
 
     pil_image = image
-    image = transforms.ToTensor()(pil_image).unsqueeze(0).cuda()
+    if device is not None:
+        image = transforms.ToTensor()(pil_image).unsqueeze(0).to(device)
+    else:
+        image = transforms.ToTensor()(pil_image).unsqueeze(0).cuda()
+        
     image_height, image_width = image.shape[-2], image.shape[-1]
 
-    if reso != '':
-        image_resolution = (int(reso.split('x')[0]), int(reso.split('x')[1]))
-    else:
-        image_resolution = (2160, 3840)
+    # if reso != '':
+    #     image_resolution = (int(reso.split('x')[0]), int(reso.split('x')[1]))
+    # else:
+    #     image_resolution = (2160, 3840)
+    image_resolution = reso
     image_hr = F.interpolate(image, image_resolution, mode='bicubic', align_corners=True)
-    preprocess = Compose([Resize(512, 384, keep_aspect_ratio=False, ensure_multiple_of=32, resize_method="minimal")])
+    preprocess = preprocess
     image_lr = preprocess(image)
 
-    if ps != '':
-        patch_size = (int(ps.split('x')[0]), int(ps.split('x')[1]))
-    else:
-        patch_size = (int(image_resolution[0] // 4), int(image_resolution[1] // 4))
-
+    # if ps != '':
+    #     patch_size = (int(ps.split('x')[0]), int(ps.split('x')[1]))
+    # else:
+    #     patch_size = (int(image_resolution[0] // 4), int(image_resolution[1] // 4))
+    patch_size = ps
     avg_depth_map = regular_tile_param(
         model, 
         image_hr, 
@@ -358,40 +346,3 @@ def create_demo_3d(model):
     submit = gr.Button("Submit")
     submit.click(partial(get_mesh, model), inputs=[input_image, mode[0], patch_number, resolution, patch_size, checkbox, occ_filter_thr, fov], outputs=[result])
     examples = gr.Examples(examples=["examples/example_1.jpeg", "examples/example_4.jpeg", "examples/example_3.jpeg"], inputs=[input_image])
-
-# controlnet
-
-css = """
-    #img-display-container {
-        max-height: 50vh;
-        }
-    #img-display-input {
-        max-height: 40vh;
-        }
-    #img-display-output {
-        max-height: 40vh;
-        }
-"""
-
-title = "# PatchFusion"
-description = """Official demo for **PatchFusion: An End-to-End Tile-Based Framework for High-Resolution Monocular Metric Depth Estimation**.
-
-PatchFusion is a deep learning model for high-resolution metric depth estimation from a single image.
-
-Please refer to our [paper](https://arxiv.org/abs/2312.02284) or [github](https://github.com/zhyever/PatchFusion) for more details."""
-
-with gr.Blocks(css=css) as demo:
-    
-    gr.Markdown(title)
-    gr.Markdown(description)
-    # create_demo(model)
-    with gr.Tab("Depth Prediction"):
-        create_demo(model)
-    with gr.Tab("Image to 3D"):
-        create_demo_3d(model)
-
-    # gr.HTML('''<br><br><br><center>You can duplicate this Space to skip the queue:<a href="https://huggingface.co/spaces/shariqfarooq/ZoeDepth?duplicate=true"><img src="https://bit.ly/3gLdBN6" alt="Duplicate Space"></a><br>
-    #     <p><img src="https://visitor-badge.glitch.me/badge?page_id=shariqfarooq.zoedepth_demo_hf" alt="visitors"></p></center>''')
-
-if __name__ == '__main__':
-    demo.queue().launch(share=True)

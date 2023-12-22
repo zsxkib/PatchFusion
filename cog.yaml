@@ -1,0 +1,38 @@
+# Configuration for Cog ⚙️
+# Reference: https://github.com/replicate/cog/blob/main/docs/yaml.md
+
+build:
+  # set to true if your model requires a GPU
+  gpu: true
+  cuda: "11.8"
+
+  # a list of ubuntu apt packages to install
+  system_packages:
+    - "libgl1-mesa-glx"
+  #   - "libglib2.0-0"
+
+  # python version in the form '3.11' or '3.11.4'
+  python_version: "3.10"
+
+  # a list of packages in the format <package-name>==<version>
+  python_packages:
+    - "torch==2.0.1 --extra-index-url https://download.pytorch.org/whl/cu118"
+    - "torchvision==0.15.2 --extra-index-url https://download.pytorch.org/whl/cu118"
+    - "torchaudio==2.0.2 --extra-index-url https://download.pytorch.org/whl/cu118"
+    - "torchtext==0.15.2 --extra-index-url https://download.pytorch.org/whl/cu118"
+    - "torchdata==0.6.1 --extra-index-url https://download.pytorch.org/whl/cu118"
+    - "einops"
+    - "gradio==3.50.2"
+    - "trimesh"
+    - "json5"
+    - "timm==0.6.12"
+    - "open_clip_torch"
+    - "pytorch-lightning==1.8.3.post0"
+    - "omegaconf"
+
+  # commands run after the environment is setup
+  run:
+    - "pip install opencv-python scipy imageio transformers"
+
+# predict.py defines how predictions are run on your model
+predict: "predict.py:Predictor"
